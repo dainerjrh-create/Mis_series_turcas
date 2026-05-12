@@ -1,0 +1,225 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TurkaPlay Pro - Miles de Series</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --primary: #f43f5e; --bg: #0f172a; }
+        body { background-color: var(--bg); color: white; scroll-behavior: smooth; }
+        .series-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+        }
+        @media (min-width: 768px) {
+            .series-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
+        }
+        .video-container { position: relative; padding-bottom: 56.25%; height: 0; background: #000; border-radius: 12px; overflow: hidden; }
+        .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .active-tab { border-bottom: 3px solid var(--primary); color: var(--primary); }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- Buscador Fijo -->
+    <div class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md p-4 border-b border-slate-800">
+        <div class="flex items-center gap-3 mb-3">
+            <h1 class="text-xl font-bold text-rose-500">TurkaPlay<span class="text-white ml-1">Pro</span></h1>
+            <div class="relative flex-1">
+                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                <input type="text" id="searchInput" onkeyup="filterSeries()" placeholder="Busca entre miles de series..." 
+                    class="w-full bg-slate-800 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-rose-500 outline-none">
+            </div>
+        </div>
+        <!-- Categorías -->
+        <div class="flex gap-4 overflow-x-auto hide-scroll text-sm font-medium">
+            <button onclick="filterCategory('Todas')" class="whitespace-nowrap pb-2 active-tab cat-btn">Todas</button>
+            <button onclick="filterCategory('Drama')" class="whitespace-nowrap pb-2 text-slate-400 cat-btn">Drama</button>
+            <button onclick="filterCategory('Acción')" class="whitespace-nowrap pb-2 text-slate-400 cat-btn">Acción</button>
+            <button onclick="filterCategory('Romance')" class="whitespace-nowrap pb-2 text-slate-400 cat-btn">Romance</button>
+            <button onclick="filterCategory('Telegram')" class="whitespace-nowrap pb-2 text-slate-400 cat-btn">En Telegram</button>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal -->
+    <main class="p-4">
+        
+        <!-- Catálogo de Series -->
+        <section id="catalog-section">
+            <div id="seriesCount" class="text-xs text-slate-500 mb-4 uppercase tracking-widest font-bold">Cargando catálogo...</div>
+            <div id="seriesGrid" class="series-grid">
+                <!-- Las series se cargan aquí -->
+            </div>
+        </section>
+
+        <!-- Reproductor -->
+        <section id="player-section" class="hidden fixed inset-0 z-[60] bg-slate-950 overflow-y-auto p-4">
+            <button onclick="closePlayer()" class="mb-4 flex items-center gap-2 text-rose-500 font-bold">
+                <i class="fas fa-chevron-left"></i> VOLVER
+            </button>
+            
+            <div id="videoContainer"></div>
+            
+            <div class="mt-6">
+                <h2 id="playerTitle" class="text-2xl font-bold"></h2>
+                <div class="flex gap-2 mt-2">
+                    <span id="playerGenre" class="bg-rose-500/20 text-rose-500 text-[10px] px-2 py-1 rounded-md border border-rose-500/30 uppercase font-bold"></span>
+                    <span class="bg-blue-500/20 text-blue-500 text-[10px] px-2 py-1 rounded-md border border-blue-500/30 uppercase font-bold">HD Disponible</span>
+                </div>
+                <p id="playerDesc" class="text-slate-400 text-sm mt-4 leading-relaxed"></p>
+                
+                <div class="mt-8">
+                    <h3 class="font-bold mb-4 flex items-center gap-2 text-slate-300">
+                        <i class="fas fa-list-ol"></i> EPISODIOS
+                    </h3>
+                    <div id="episodesGrid" class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        <!-- Episodios aquí -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Navegación Inferior -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-lg border-t border-slate-800 p-3 flex justify-around items-center z-50">
+        <button onclick="window.scrollTo(0,0)" class="text-rose-500 flex flex-col items-center">
+            <i class="fas fa-th-large text-xl"></i>
+            <span class="text-[10px] mt-1">Catálogo</span>
+        </button>
+        <button onclick="window.open('https://t.me/SeriesTurcasGratis', '_blank')" class="text-slate-400 flex flex-col items-center">
+            <i class="fab fa-telegram-plane text-xl"></i>
+            <span class="text-[10px] mt-1">Canales</span>
+        </button>
+        <button class="text-slate-400 flex flex-col items-center">
+            <i class="fas fa-heart text-xl"></i>
+            <span class="text-[10px] mt-1">Favoritos</span>
+        </button>
+    </nav>
+
+    <script>
+        // Simulamos una base de datos gigante. 
+        // En una app real, podrías cargar un JSON externo con fetch('url_de_tu_json')
+        let allSeries = [];
+        const generos = ["Drama", "Romance", "Acción"];
+
+        // Generador de "Miles" de series (Simulación para el ejemplo)
+        function generateDemoData() {
+            const demoSeries = [
+                { id: 1, title: "Yargi: El Juicio", genre: "Drama", desc: "Un fiscal y una abogada cruzan sus caminos.", img: "https://via.placeholder.com/300x450/1e293b/ffffff?text=YARGI", eps: 95 },
+                { id: 2, title: "Hercai", genre: "Romance", desc: "Amor nacido de la venganza entre dos familias.", img: "https://via.placeholder.com/300x450/1e293b/ffffff?text=HERCAI", eps: 69 },
+                { id: 3, title: "Kara Sevda", genre: "Drama", desc: "Dos mundos separados por una brecha económica.", img: "https://via.placeholder.com/300x450/1e293b/ffffff?text=KARA+SEVDA", eps: 74 },
+                { id: 4, title: "Teşkilat", genre: "Acción", desc: "La unidad especial de inteligencia de Turquía.", img: "https://via.placeholder.com/300x450/1e293b/ffffff?text=TESKILAT", eps: 100 }
+            ];
+
+            // Replicamos para simular "miles"
+            for(let i = 5; i <= 1000; i++) {
+                const randomBase = demoSeries[Math.floor(Math.random() * demoSeries.length)];
+                allSeries.push({
+                    ...randomBase,
+                    id: i,
+                    title: `${randomBase.title} - T${Math.ceil(i/10)}`,
+                    genre: generos[Math.floor(Math.random() * generos.length)]
+                });
+            }
+        }
+
+        function renderSeries(data) {
+            const grid = document.getElementById('seriesGrid');
+            const count = document.getElementById('seriesCount');
+            grid.innerHTML = '';
+            count.innerText = `${data.length} Series encontradas`;
+
+            data.slice(0, 100).forEach(serie => { // Mostramos 100 iniciales para fluidez
+                const card = document.createElement('div');
+                card.className = "group cursor-pointer active:scale-95 transition-all";
+                card.onclick = () => openPlayer(serie);
+                card.innerHTML = `
+                    <div class="relative rounded-xl overflow-hidden shadow-lg border border-slate-800">
+                        <img src="${serie.img}" loading="lazy" class="w-full aspect-[2/3] object-cover group-hover:scale-110 transition-transform duration-500">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/90 to-transparent">
+                            <p class="text-[10px] text-rose-400 font-bold uppercase">${serie.genre}</p>
+                            <h3 class="text-xs font-bold truncate">${serie.title}</h3>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterSeries() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allSeries.filter(s => s.title.toLowerCase().includes(query));
+            renderSeries(filtered);
+        }
+
+        function filterCategory(cat) {
+            // Estética de pestañas
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                btn.classList.remove('active-tab', 'text-rose-500');
+                btn.classList.add('text-slate-400');
+                if(btn.innerText === cat) {
+                    btn.classList.add('active-tab', 'text-rose-500');
+                }
+            });
+
+            if(cat === 'Todas') {
+                renderSeries(allSeries);
+            } else {
+                const filtered = allSeries.filter(s => s.genre === cat);
+                renderSeries(filtered);
+            }
+        }
+
+        function openPlayer(serie) {
+            const section = document.getElementById('player-section');
+            section.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+
+            document.getElementById('playerTitle').innerText = serie.title;
+            document.getElementById('playerGenre').innerText = serie.genre;
+            document.getElementById('playerDesc').innerText = serie.desc;
+
+            // Simulador de capítulos
+            const epsGrid = document.getElementById('episodesGrid');
+            epsGrid.innerHTML = '';
+            for(let i = 1; i <= serie.eps; i++) {
+                const btn = document.createElement('button');
+                btn.className = "bg-slate-800 hover:bg-rose-600 py-2 rounded text-sm font-bold transition-colors border border-slate-700";
+                btn.innerText = i;
+                btn.onclick = () => loadVideo(`https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1`); // Enlace real aquí
+                epsGrid.appendChild(btn);
+            }
+            
+            // Cargar primero automáticamente
+            loadVideo(`https://www.youtube.com/embed/dQw4w9WgXcQ`);
+        }
+
+        function loadVideo(url) {
+            document.getElementById('videoContainer').innerHTML = `
+                <div class="video-container">
+                    <iframe src="${url}" allowfullscreen allow="autoplay"></iframe>
+                </div>
+            `;
+        }
+
+        function closePlayer() {
+            document.getElementById('player-section').classList.add('hidden');
+            document.getElementById('videoContainer').innerHTML = '';
+            document.body.style.overflow = 'auto';
+        }
+
+        window.onload = () => {
+            generateDemoData();
+            renderSeries(allSeries);
+        };
+    </script>
+</body>
+</html>
+
+```
+  
